@@ -16,6 +16,14 @@ requests, specified by `HalfOpenMaxRequests`, to test if the service has recover
 the success or failure of these requests, the circuit either moves back to `closed` or
 `open`.
 
+## Installation
+
+Install with:
+
+```sh
+go get github.com/rednafi/circuit-breaker/cb
+```
+
 ## Usage
 
 ### Defining configuration
@@ -88,4 +96,40 @@ timeoutFn := func() (any, error) {
     return nil, errors.New("timeout")
 }
 result, err := cb.Call(timeoutFn)
+```
+
+## Complete example
+
+```go
+// main.go
+
+package main
+
+import (
+	"github.com/rednafi/circuit-breaker/cb"
+	"time"
+)
+
+func main() {
+	fn := func() (any, error) {
+		return "Hello, World!", nil
+	}
+	cb := cb.NewCircuitBreaker(3, 5*time.Second, 2)
+
+	result, err := cb.Call(fn)
+	if err != nil {
+		panic(err)
+	}
+	println(result.(string))
+}
+```
+
+Running this with `go run main.go` prints:
+
+```txt
+2024/10/06 14:22:40 INFO Making a request state=closed
+2024/10/06 14:22:40 INFO Request succeeded in closed state. Circuit remains closed.
+2024/10/06 14:22:40 INFO Circuit reset to closed state.
+Hello, World!
+$ go run main.go
 ```
