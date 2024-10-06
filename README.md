@@ -1,4 +1,4 @@
-# Circuit breaker
+# circuit-breaker
 
 A minimal circuit breaker implementation in Go that manages service request flow by
 switching between `closed`, `open`, and `half-open` states.
