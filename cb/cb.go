@@ -16,19 +16,25 @@ const (
 
 // circuitBreaker manages the state and behavior of the circuit breaker
 type circuitBreaker struct {
-	mu                   sync.Mutex    // Mutex to protect state
-	state                string        // Current state of the circuit breaker
-	failureCount         int           // Number of consecutive failures
-	lastFailureTime      time.Time     // Time of the last failure
-	halfOpenSuccessCount int           // Number of successful requests in half-open state
-	failureThreshold     int           // Number of failures to trigger open state
-	recoveryTime         time.Duration // Time to wait before transitioning to half-open
-	halfOpenMaxRequests  int           // Number of requests to allow in half-open state
-	timeout              time.Duration // Timeout for requests
+	mu                   sync.Mutex // Guards the circuit breaker state
+	state                string     // Current state of the circuit breaker
+	failureCount         int        // Number of consecutive failures
+	lastFailureTime      time.Time  // Time of the last failure
+	halfOpenSuccessCount int        // Number of successful requests in half-open state
+
+	failureThreshold    int           // Number of failures to trigger open state
+	recoveryTime        time.Duration // Time to wait before transitioning to half-open
+	halfOpenMaxRequests int           // Number of requests to allow in half-open state
+	timeout             time.Duration // Timeout for requests
 }
 
-// NewCircuitBreaker initializes a new CircuitBreaker with a configurable timeout
-func NewCircuitBreaker(failureThreshold int, recoveryTime time.Duration, halfOpenMaxRequests int, timeout time.Duration) *circuitBreaker {
+// NewCircuitBreaker initializes a new CircuitBreaker
+func NewCircuitBreaker(
+	failureThreshold int,
+	recoveryTime time.Duration,
+	halfOpenMaxRequests int,
+	timeout time.Duration,
+) *circuitBreaker {
 	return &circuitBreaker{
 		state:               Closed,
 		failureThreshold:    failureThreshold,
@@ -112,7 +118,7 @@ func (cb *circuitBreaker) handleHalfOpenState(fn func() (any, error)) (any, erro
 	return result, nil
 }
 
-// runWithTimeout executes the provided function with a configurable timeout
+// runWithTimeout executes the provided function with a timeout
 func (cb *circuitBreaker) runWithTimeout(fn func() (any, error)) (any, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), cb.timeout)
 	defer cancel()
