@@ -116,7 +116,9 @@ func main() {
 	fn := func() (any, error) {
 		return "Hello, World!", nil
 	}
-	cb := cb.NewCircuitBreaker(3, 5*time.Second, 2) // Initialize with 3 failure threshold, 5 sec recovery, 2 half-open requests
+
+  // Initialize with 3 failure threshold, 5 sec recovery, 2 half-open requests
+	cb := cb.NewCircuitBreaker(3, 5*time.Second, 2)
 
 	result, err := cb.Call(fn)
 	if err != nil {
