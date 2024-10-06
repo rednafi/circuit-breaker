@@ -14,35 +14,37 @@ const (
 	HalfOpen = "half-open"
 )
 
+// circuitBreaker manages the state and behavior of the circuit breaker
 type circuitBreaker struct {
-	FailureThreshold     int
-	FailureCount         int
-	RecoveryTime         time.Duration
-	State                string
-	LastFailureTime      time.Time
-	HalfOpenSuccessCount int
-	HalfOpenMaxRequests  int
 	mu                   sync.Mutex
+	state                string
+	failureCount         int
+	lastFailureTime      time.Time
+	halfOpenSuccessCount int
+
+	failureThreshold    int
+	recoveryTime        time.Duration
+	halfOpenMaxRequests int
 }
 
-func NewCircuitBreaker(
-	failureThreshold int, recoveryTime time.Duration,
-	halfOpenMaxRequests int,
-) *circuitBreaker {
+// NewCircuitBreaker initializes a new CircuitBreaker
+func NewCircuitBreaker(failureThreshold int, recoveryTime time.Duration, halfOpenMaxRequests int) *circuitBreaker {
 	return &circuitBreaker{
-		FailureThreshold:    failureThreshold,
-		RecoveryTime:        recoveryTime,
-		State:               Closed,
-		HalfOpenMaxRequests: halfOpenMaxRequests,
+		state:               Closed,
+		failureThreshold:    failureThreshold,
+		recoveryTime:        recoveryTime,
+		halfOpenMaxRequests: halfOpenMaxRequests,
 	}
 }
 
+// Call attempts to execute the provided function, managing state transitions
 func (cb *circuitBreaker) Call(fn func() (any, error)) (any, error) {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 
-	slog.Info("Making a request", "state", cb.State)
-	switch cb.State {
+	slog.Info("Making a request", "state", cb.state)
+
+	switch cb.state {
 	case Closed:
 		return cb.handleClosedState(fn)
 	case Open:
@@ -54,73 +56,64 @@ func (cb *circuitBreaker) Call(fn func() (any, error)) (any, error) {
 	}
 }
 
-func (cb *circuitBreaker) handleClosedState(
-	fn func() (any, error),
-) (any, error) {
+// handleClosedState executes the function and monitors failures
+func (cb *circuitBreaker) handleClosedState(fn func() (any, error)) (any, error) {
 	result, err := cb.runWithTimeout(fn)
 	if err != nil {
-		slog.Warn(
-			"Request failed in closed state. Incrementing failure count.",
-		)
-		cb.recordFailure()
+		slog.Warn("Request failed in closed state", "failureCount", cb.failureCount+1)
+		cb.failureCount++
+		cb.lastFailureTime = time.Now()
+
+		if cb.failureCount >= cb.failureThreshold {
+			cb.state = Open
+			slog.Error("Failure threshold reached, transitioning to open")
+		}
 		return nil, err
 	}
-	slog.Info("Request succeeded in closed state. Circuit remains closed.")
-	cb.reset() // Reset after a successful request
+
+	slog.Info("Request succeeded in closed state")
+	cb.resetCircuit()
 	return result, nil
 }
 
+// handleOpenState blocks requests if recovery time hasn't passed
 func (cb *circuitBreaker) handleOpenState() (any, error) {
-	if time.Since(cb.LastFailureTime) > cb.RecoveryTime {
-		slog.Info(
-			"Recovery period expired. Transitioning to half-open state.",
-		)
-		cb.State = HalfOpen
-		cb.FailureCount = 0 // Reset failure count in half-open state
-		cb.HalfOpenSuccessCount = 0
+	if time.Since(cb.lastFailureTime) > cb.recoveryTime {
+		cb.state = HalfOpen
+		cb.halfOpenSuccessCount = 0
+		cb.failureCount = 0
+		slog.Info("Recovery period over, transitioning to half-open")
 		return nil, nil
 	}
-	slog.Warn("Circuit is still open. Blocking requests.")
-	return nil, errors.New("circuit is open. Blocking request.")
+
+	slog.Warn("Circuit is still open, blocking request")
+	return nil, errors.New("circuit open, request blocked")
 }
 
-func (cb *circuitBreaker) handleHalfOpenState(
-	fn func() (any, error),
-) (any, error) {
+// handleHalfOpenState executes the function and checks for recovery
+func (cb *circuitBreaker) handleHalfOpenState(fn func() (any, error)) (any, error) {
 	result, err := cb.runWithTimeout(fn)
 	if err != nil {
-		slog.Error(
-			"Request failed in half-open state. Circuit transitioning back.",
-		)
-		cb.State = Open
-		cb.LastFailureTime = time.Now()
+		slog.Error("Request failed in half-open state, transitioning to open")
+		cb.state = Open
+		cb.lastFailureTime = time.Now()
 		return nil, err
 	}
 
-	cb.HalfOpenSuccessCount++
-	slog.Info(
-		"Request succeeded in half-open state.",
-		"successCount", cb.HalfOpenSuccessCount,
-		"maxRequests", cb.HalfOpenMaxRequests,
-	)
+	cb.halfOpenSuccessCount++
+	slog.Info("Request succeeded in half-open state", "successCount", cb.halfOpenSuccessCount)
 
-	// If enough successful requests are made, transition to closed state
-	if cb.HalfOpenSuccessCount >= cb.HalfOpenMaxRequests {
-		slog.Info(
-			"Enough successful requests in half-open state. Transitioning.",
-		)
-		cb.reset()
+	if cb.halfOpenSuccessCount >= cb.halfOpenMaxRequests {
+		slog.Info("Max success in half-open, transitioning to closed")
+		cb.resetCircuit()
 	}
 
 	return result, nil
 }
 
-func (cb *circuitBreaker) runWithTimeout(
-	fn func() (any, error),
-) (any, error) {
-	ctx, cancel := context.WithTimeout(
-		context.Background(), 2*time.Second,
-	)
+// runWithTimeout executes the provided function with a timeout
+func (cb *circuitBreaker) runWithTimeout(fn func() (any, error)) (any, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	resultChan := make(chan struct {
@@ -144,28 +137,9 @@ func (cb *circuitBreaker) runWithTimeout(
 	}
 }
 
-func (cb *circuitBreaker) recordFailure() {
-	cb.FailureCount++
-	cb.LastFailureTime = time.Now()
-
-	if cb.FailureCount >= cb.FailureThreshold {
-		slog.Error(
-			"Failure threshold reached. Circuit transitioning to open.",
-			"failureCount", cb.FailureCount,
-			"threshold", cb.FailureThreshold,
-		)
-		cb.State = Open
-	} else {
-		slog.Warn(
-			"Failure recorded",
-			"failureCount", cb.FailureCount,
-			"threshold", cb.FailureThreshold,
-		)
-	}
-}
-
-func (cb *circuitBreaker) reset() {
-	cb.FailureCount = 0
-	cb.State = Closed
-	slog.Info("Circuit reset to closed state.")
+// resetCircuit resets the circuit breaker to closed state
+func (cb *circuitBreaker) resetCircuit() {
+	cb.failureCount = 0
+	cb.state = Closed
+	slog.Info("Circuit reset to closed state")
 }

@@ -18,7 +18,11 @@ func unreliableService() (any, error) {
 }
 
 func main() {
-	cb := cb.NewCircuitBreaker(3, 5*time.Second, 2)
+	cb := cb.NewCircuitBreaker(
+		2,             // Failure threshold
+		2*time.Second, // Recovery time
+		2,             // Half-open max requests)
+	)
 
 	for i := 0; i < 5; i++ {
 		result, err := cb.Call(unreliableService)
