@@ -39,10 +39,7 @@ func TestCircuitBreaker_ClosedStateFailure(t *testing.T) {
 	}
 
 	// First failure
-	result, err := cb.Call(failFn)
-	if err != nil {
-		t.Fatalf("expected error, got nil")
-	}
+	_, err := cb.Call(failFn)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
