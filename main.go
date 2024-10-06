@@ -4,7 +4,7 @@ package main
 
 import (
 	"errors"
-	"github.com/rednafi/cb/cb"
+	"github.com/rednafi/circuit-breaker/cb"
 	"log"
 	"log/slog"
 	"time"
