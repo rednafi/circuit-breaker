@@ -7,9 +7,9 @@ import (
 )
 
 func TestCircuitBreaker_ClosedStateSuccess(t *testing.T) {
-	t.Parallel() // Mark the test to run in parallel
+	t.Parallel()
 
-	cb := NewCircuitBreaker(3, 5*time.Second, 3)
+	cb := NewCircuitBreaker(3, 5*time.Second, 3, 2*time.Second) // Updated argument order
 
 	successFn := func() (any, error) {
 		return 42, nil
@@ -30,9 +30,9 @@ func TestCircuitBreaker_ClosedStateSuccess(t *testing.T) {
 }
 
 func TestCircuitBreaker_ClosedStateFailure(t *testing.T) {
-	t.Parallel() // Mark the test to run in parallel
+	t.Parallel()
 
-	cb := NewCircuitBreaker(2, 5*time.Second, 3) // Lowered threshold for testing
+	cb := NewCircuitBreaker(2, 5*time.Second, 3, 2*time.Second) // Updated argument order
 
 	failFn := func() (any, error) {
 		return nil, errors.New("failure")
@@ -56,9 +56,9 @@ func TestCircuitBreaker_ClosedStateFailure(t *testing.T) {
 }
 
 func TestCircuitBreaker_OpenToHalfOpen(t *testing.T) {
-	t.Parallel() // Mark the test to run in parallel
+	t.Parallel()
 
-	cb := NewCircuitBreaker(1, 1*time.Second, 2) // Lowered threshold and recovery time for testing
+	cb := NewCircuitBreaker(1, 1*time.Second, 2, 2*time.Second) // Updated argument order
 
 	failFn := func() (any, error) {
 		return nil, errors.New("failure")
@@ -69,8 +69,6 @@ func TestCircuitBreaker_OpenToHalfOpen(t *testing.T) {
 
 	// After the first failure, the circuit should transition to open
 	_, err := cb.Call(failFn)
-
-	// Fix the expected error message to match the actual message returned by the code
 	if err == nil || err.Error() != "circuit open, request blocked" {
 		t.Fatalf("expected error 'circuit open, request blocked', got %v", err)
 	}
@@ -84,7 +82,6 @@ func TestCircuitBreaker_OpenToHalfOpen(t *testing.T) {
 		t.Fatalf("expected no error during transition to half-open, got %v", err)
 	}
 
-	// Check that the state is now half-open
 	if cb.state != HalfOpen {
 		t.Fatalf("expected state half-open, got %s", cb.state)
 	}
@@ -125,9 +122,9 @@ func TestCircuitBreaker_OpenToHalfOpen(t *testing.T) {
 }
 
 func TestCircuitBreaker_HalfOpenStateFailure(t *testing.T) {
-	t.Parallel() // Mark the test to run in parallel
+	t.Parallel()
 
-	cb := NewCircuitBreaker(1, 1*time.Second, 2) // Lowered threshold for testing
+	cb := NewCircuitBreaker(1, 1*time.Second, 2, 2*time.Second) // Updated argument order
 
 	cb.state = HalfOpen
 
@@ -147,9 +144,9 @@ func TestCircuitBreaker_HalfOpenStateFailure(t *testing.T) {
 }
 
 func TestCircuitBreaker_OpenToHalfOpenSuccess(t *testing.T) {
-	t.Parallel() // Mark the test to run in parallel
+	t.Parallel()
 
-	cb := NewCircuitBreaker(1, 1*time.Second, 1) // Lowered threshold and recovery time for testing
+	cb := NewCircuitBreaker(1, 1*time.Second, 1, 2*time.Second) // Updated argument order
 
 	// Simulate a failure to trigger transition to open
 	failFn := func() (any, error) {
@@ -197,9 +194,9 @@ func TestCircuitBreaker_OpenToHalfOpenSuccess(t *testing.T) {
 }
 
 func TestCircuitBreaker_RequestTimeout(t *testing.T) {
-	t.Parallel() // Mark the test to run in parallel
+	t.Parallel()
 
-	cb := NewCircuitBreaker(2, 1*time.Second, 3)
+	cb := NewCircuitBreaker(2, 1*time.Second, 3, 2*time.Second) // Updated argument order
 
 	// Simulate a service call that hangs (takes longer than the timeout)
 	timeoutFn := func() (any, error) {

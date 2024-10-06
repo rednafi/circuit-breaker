@@ -21,7 +21,8 @@ func main() {
 	cb := cb.NewCircuitBreaker(
 		2,             // Failure threshold
 		2*time.Second, // Recovery time
-		2,             // Half-open max requests)
+		2,             // Half-open max requests
+		2*time.Second, // Timeout
 	)
 
 	for i := 0; i < 5; i++ {
