@@ -23,7 +23,7 @@ jobs:
 
       - name: Install prettier
         run: |
-          npm install --save-dev prettier
+          npm install -g prettier
 
       - name: Verify Go & Prettier formatting
         run: |
