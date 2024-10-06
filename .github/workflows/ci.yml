@@ -21,12 +21,9 @@ jobs:
         with:
           go-version: "stable"
 
-      - name: Verify go fmt
+      - name: Verify go & prettier formatting
         run: |
-          if [ -n "$(gofmt -l .)" ]; then
-            echo "Go code is not formatted. Run 'go fmt' on your code."
-            exit 1
-          fi
+          make lint-check
 
       - name: Run tests
         run: |
