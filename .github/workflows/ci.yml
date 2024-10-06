@@ -21,7 +21,15 @@ jobs:
         with:
           go-version: "stable"
 
-      - name: Verify go & prettier formatting
+      - name: Install dependencies
+        run: |
+          npm ci
+
+      - name: Install prettier
+        run: |
+          npm install --save-dev prettier
+
+      - name: Verify Go & Prettier formatting
         run: |
           make lint-check
 
