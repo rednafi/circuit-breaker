@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Go dependencies
+  - package-ecosystem: "go"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

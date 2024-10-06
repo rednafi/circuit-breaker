@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 'stable'
+
+    - name: Verify go fmt
+      run: |
+        if [ -n "$(gofmt -l .)" ]; then
+          echo "Go code is not formatted. Run 'go fmt' on your code."
+          exit 1
+        fi
+
+    - name: Run tests
+      run: |
+        make test
